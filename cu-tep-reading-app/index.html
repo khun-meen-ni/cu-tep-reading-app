@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CU-TEP Reading Comprehension Practice | จำลองสอบจริง 58 ข้อ อ้างอิง Chulatutor</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: ['selector', '[data-theme="dark"]'],
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-blue-200">
+
+  <!-- Top Navbar -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 dark:bg-slate-900/95 dark:border-slate-800 transition-colors">
+    <div class="max-w-[1700px] mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-2 sm:gap-4">
+      
+      <!-- Brand & Mode Controls -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div class="flex items-center gap-2 cursor-pointer" onclick="goToQuestion(1)">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
+            <i data-lucide="book-open-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
+              <span>CU-TEP Reading</span>
+              <span class="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
+                58 ข้อสมบูรณ์
+              </span>
+            </h1>
+            <p class="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400">แนวข้อสอบจริง Chulatutor</p>
+          </div>
+        </div>
+
+        <!-- Mode Toggle Pill -->
+        <div class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-semibold ml-1">
+          <button id="btnModeExam" onclick="setAppMode('exam')" class="px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 bg-white text-blue-600 shadow-xs dark:bg-slate-700 dark:text-blue-400">
+            <i data-lucide="timer" class="w-3.5 h-3.5"></i>
+            โหมดสอบจริง (70 นาที)
+          </button>
+          <button id="btnModePractice" onclick="setAppMode('practice')" class="px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            โหมดฝึกทำ + เฉลยทันที
+          </button>
+        </div>
+      </div>
+
+      <!-- Center: Section Selector & Timer -->
+      <div class="flex items-center gap-2">
+        <!-- Section Dropdown (Quick Jump) -->
+        <div class="relative">
+          <select id="sectionSelect" onchange="switchSection(this.value)" class="text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[140px] sm:max-w-[220px] md:max-w-[260px] truncate cursor-pointer">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <!-- Timer Widget -->
+        <div id="timerWidget" class="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 rounded-xl bg-blue-50 border border-blue-200 dark:bg-slate-800 dark:border-slate-700 shrink-0">
+          <i data-lucide="clock" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
+          <span id="timerDisplay" class="font-mono font-bold text-xs sm:text-sm text-blue-700 dark:text-blue-300">70:00</span>
+          <button onclick="toggleTimer()" title="หยุด/เริ่มจับเวลาต่อ" class="text-slate-500 hover:text-blue-600 transition-colors p-0.5">
+            <i id="timerIcon" data-lucide="pause" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: Tools, Question Grid & Actions -->
+      <div class="flex items-center gap-1 sm:gap-2">
+        <!-- Sound Toggle -->
+        <button id="btnSoundToggle" onclick="toggleSound()" title="เปิด/ปิดเสียงเอฟเฟกต์ตอบข้อสอบ" class="p-2 text-slate-600 hover:text-blue-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded-xl transition-all">
+          <i id="soundIcon" data-lucide="volume-2" class="w-4 h-4"></i>
+        </button>
+
+        <!-- Vocab Bank Button -->
+        <button onclick="openModal('modalVocab')" title="คลังคำศัพท์วิชาการ CU-TEP" class="p-2 text-slate-600 hover:text-emerald-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded-xl transition-all flex items-center gap-1.5 text-xs font-semibold">
+          <i data-lucide="languages" class="w-4 h-4 text-emerald-600"></i>
+          <span class="hidden xl:inline">คำศัพท์ (24)</span>
+        </button>
+
+        <!-- Chulatutor Tips Button -->
+        <button onclick="openModal('modalTips')" title="เทคนิคทำข้อสอบจากจุฬาติวเตอร์" class="p-2 text-slate-600 hover:text-amber-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded-xl transition-all flex items-center gap-1.5 text-xs font-semibold">
+          <i data-lucide="lightbulb" class="w-4 h-4 text-amber-500"></i>
+          <span class="hidden xl:inline">เทคนิคสอบ</span>
+        </button>
+
+        <!-- Appearance (Theme & Font) -->
+        <div class="relative">
+          <button onclick="toggleAppearanceDropdown()" id="btnAppearance" title="ตั้งค่าฟอนต์และธีม" class="p-2 text-slate-600 hover:text-blue-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded-xl transition-all">
+            <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+          </button>
+          
+          <!-- Appearance Dropdown Menu -->
+          <div id="appearanceMenu" class="hidden absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-3 z-50">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">ขนาดตัวอักษร Passage</p>
+            <div class="flex items-center justify-between bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl mb-3">
+              <button onclick="adjustFontSize(-1)" class="p-1.5 hover:bg-white dark:hover:bg-slate-600 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors w-1/3">A- เล็ก</button>
+              <button onclick="resetFontSize()" class="p-1.5 hover:bg-white dark:hover:bg-slate-600 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors w-1/3">ปกติ</button>
+              <button onclick="adjustFontSize(1)" class="p-1.5 hover:bg-white dark:hover:bg-slate-600 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors w-1/3">A+ ใหญ่</button>
+            </div>
+
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">ธีมการอ่าน</p>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button onclick="setTheme('light')" class="py-1.5 px-2 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-600 hover:border-blue-500 flex flex-col items-center gap-1 bg-white text-slate-800">
+                <i data-lucide="sun" class="w-3.5 h-3.5 text-amber-500"></i>
+                สว่าง
+              </button>
+              <button onclick="setTheme('sepia')" class="py-1.5 px-2 rounded-xl text-xs font-medium border border-amber-200 hover:border-amber-500 flex flex-col items-center gap-1 bg-[#f4ecd8] text-[#433422]">
+                <i data-lucide="coffee" class="w-3.5 h-3.5 text-amber-700"></i>
+                สบายตา
+              </button>
+              <button onclick="setTheme('dark')" class="py-1.5 px-2 rounded-xl text-xs font-medium border border-slate-700 hover:border-blue-400 flex flex-col items-center gap-1 bg-slate-900 text-slate-200">
+                <i data-lucide="moon" class="w-3.5 h-3.5 text-blue-400"></i>
+                มืด
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Question Drawer Button -->
+        <button onclick="openModal('modalAnswerSheet')" class="px-2.5 sm:px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl transition-all text-xs font-bold flex items-center gap-1.5">
+          <i data-lucide="layout-grid" class="w-4 h-4 text-blue-600 dark:text-blue-400"></i>
+          <span class="hidden sm:inline">กระดาษคำตอบ</span>
+          <span id="answeredBadge" class="bg-blue-600 text-white rounded-full px-1.5 py-0.2 text-[10px] font-bold">0/58</span>
+        </button>
+
+        <!-- Submit Button -->
+        <button onclick="confirmSubmitExam()" class="px-3 sm:px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all text-xs font-extrabold shadow-md shadow-blue-500/25 flex items-center gap-1.5 shrink-0">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+          <span>ส่งข้อสอบ</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Mobile Segmented Tabs (Screens < 1024px) -->
+  <div id="mobileTabs" class="lg:hidden flex items-center justify-around bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-1 text-xs font-bold">
+    <button id="tabBtnPassage" onclick="setMobileView('passage')" class="w-1/2 py-2 text-center rounded-xl transition-all bg-white text-blue-600 shadow-xs dark:bg-slate-700 dark:text-blue-400 flex items-center justify-center gap-1.5">
+      <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+      <span>บทอ่าน (Passage)</span>
+    </button>
+    <button id="tabBtnQuestion" onclick="setMobileView('question')" class="w-1/2 py-2 text-center rounded-xl transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 flex items-center justify-center gap-1.5">
+      <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+      <span>ข้อสอบ (ข้อที่ <span id="mobileCurrentQBadge">1</span>)</span>
+    </button>
+  </div>
+
+  <!-- Main Dual-Pane Test Container -->
+  <main class="exam-container">
+
+    <!-- LEFT PANE: Reading Passage & Highlight Tools -->
+    <section id="panePassage" class="pane-passage p-4 sm:p-6 lg:p-7 flex flex-col">
+      
+      <!-- Passage Header with Meta & Action Toolbar -->
+      <div class="pb-3 mb-3 border-b border-slate-200 dark:border-slate-800">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+          <div>
+            <span id="passageTag" class="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">PART 1: CLOZE TEST</span>
+            <h2 id="passageTitle" class="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white mt-0.5">Children's Homework & Parents' Role</h2>
+            <p id="passageSubtitle" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">คำถามข้อ 1 - 15 (จำนวน 15 ช่องว่าง)</p>
+          </div>
+
+          <!-- Thai Translation Toggle & Clear Clue Button -->
+          <div class="flex items-center gap-2">
+            <button id="btnToggleThai" onclick="toggleThaiTranslation()" class="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-1.5 hover:bg-emerald-100 transition-all shadow-2xs">
+              <i data-lucide="languages" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span id="thaiToggleText">🇹🇭 แปลไทยทั้งบทความ</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sub-toolbar: Search in Passage & Highlighter Buttons -->
+        <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-100 dark:bg-slate-800/80 p-2 rounded-2xl">
+          <!-- Keyword Search in Passage -->
+          <div class="relative flex-1 min-w-[180px] max-w-[280px]">
+            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400"></i>
+            <input type="text" id="passageSearchInput" oninput="searchInPassage(this.value)" placeholder="ค้นหาคำศัพท์ในเรื่อง..." class="w-full pl-8 pr-7 py-1 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-200">
+            <button id="btnSearchClear" onclick="clearPassageSearch()" class="hidden absolute right-2 top-1.5 text-slate-400 hover:text-slate-600 p-0.5">
+              <i data-lucide="x" class="w-3 h-3"></i>
+            </button>
+          </div>
+
+          <!-- Highlight Color Buttons -->
+          <div class="flex items-center gap-1">
+            <span class="text-[11px] font-medium text-slate-400 mr-1 hidden sm:inline"><i data-lucide="highlighter" class="w-3 h-3 inline"></i> ไฮไลต์:</span>
+            <button onclick="applyHighlight('yellow')" title="ไฮไลต์สีเหลือง (ลากคลุมข้อความก่อนกด)" class="w-6 h-6 rounded-md bg-yellow-300 hover:scale-110 transition-transform shadow-2xs"></button>
+            <button onclick="applyHighlight('green')" title="ไฮไลต์สีเขียว (ลากคลุมข้อความก่อนกด)" class="w-6 h-6 rounded-md bg-emerald-300 hover:scale-110 transition-transform shadow-2xs"></button>
+            <button onclick="applyHighlight('pink')" title="ไฮไลต์สีชมพู (ลากคลุมข้อความก่อนกด)" class="w-6 h-6 rounded-md bg-pink-300 hover:scale-110 transition-transform shadow-2xs"></button>
+            <button onclick="clearHighlights()" title="ล้างไฮไลต์ในหน้านี้" class="w-6 h-6 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-colors ml-1">
+              <i data-lucide="eraser" class="w-3 h-3"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Passage Body -->
+      <div id="passageContainer" class="passage-content flex-1 text-slate-700 dark:text-slate-200 leading-relaxed font-normal selection:bg-yellow-200 selection:text-black">
+        <!-- Rendered dynamically via JS -->
+      </div>
+
+      <!-- Passage Footer Info -->
+      <div class="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+        <span class="flex items-center gap-1">
+          <i data-lucide="mouse-pointer-click" class="w-3.5 h-3.5"></i>
+          Tip: ในโหมด Cloze Test ตัวเลือกที่ตอบจะถูกเติมลงในเนื้อเรื่องโดยอัตโนมัติ
+        </span>
+        <span id="wordCountBadge" class="font-mono">~350 words</span>
+      </div>
+    </section>
+
+
+    <!-- RIGHT PANE: Quick Question Strip, Questions & Options -->
+    <section id="paneQuestion" class="pane-questions p-4 sm:p-6 lg:p-7 flex flex-col justify-between">
+      
+      <!-- Top Section inside Question Pane -->
+      <div>
+        
+        <!-- Quick Question Strip (1 to 58 Horizontal Ribbon) -->
+        <div class="mb-4 bg-white dark:bg-slate-800/80 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xs">
+          <div class="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 px-1">
+            <span>แถบข้อสอบ 1 - 58 (คลิกข้ามข้อได้ทันที)</span>
+            <span class="text-blue-600 dark:text-blue-400" id="stripProgressText">ตอบแล้ว 0 / 58</span>
+          </div>
+          <div id="quickStripContainer" class="q-strip-container">
+            <!-- 58 pills rendered via JS -->
+          </div>
+        </div>
+
+        <!-- Question Meta & Controls Bar -->
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">คำถาม</span>
+            <span id="currentQuestionNum" class="text-2xl font-black text-blue-600 dark:text-blue-400">1</span>
+            <span class="text-xs font-bold text-slate-400">/ 58</span>
+            <span id="questionTypeBadge" class="ml-2 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/50">
+              Cloze Blank
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- Flag Button -->
+            <button id="btnFlag" onclick="toggleCurrentFlag()" class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-amber-400 text-slate-600 dark:text-slate-300 hover:text-amber-600 transition-all text-xs font-semibold flex items-center gap-1.5">
+              <i data-lucide="flag" class="w-3.5 h-3.5 text-slate-400" id="flagIcon"></i>
+              <span id="flagText">ปักหมุดทบทวน</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Question Prompt Card -->
+        <div class="bg-white dark:bg-slate-800/90 rounded-2xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm mb-4">
+          <h3 id="questionPrompt" class="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug">
+            Choose the best answer to fill in blank [1]:
+          </h3>
+        </div>
+
+        <!-- Options Container -->
+        <div id="optionsList" class="space-y-2.5">
+          <!-- Options rendered dynamically -->
+        </div>
+
+        <!-- Practice Mode Instant Explanation Box -->
+        <div id="practiceExplanationCard" class="hidden mt-5 bg-emerald-50/80 border border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800/60 rounded-2xl p-5 shadow-2xs">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+              เฉลยละเอียด & วิเคราะห์เหตุผล (Chulatutor)
+            </span>
+            <span id="correctChoiceBadge" class="text-xs font-extrabold px-2.5 py-0.5 rounded-md bg-emerald-200 text-emerald-900 dark:bg-emerald-800 dark:text-emerald-200">
+              ข้อที่ถูกต้อง: A
+            </span>
+          </div>
+          <p id="explanationText" class="text-sm text-slate-700 dark:text-slate-200 leading-relaxed font-normal">
+            <!-- Explanation from Chulatutor -->
+          </p>
+        </div>
+      </div>
+
+      <!-- Question Navigation Controls (Bottom Bar) -->
+      <div class="mt-6 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+        <button onclick="prevQuestion()" id="btnPrev" class="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all">
+          <i data-lucide="chevron-left" class="w-4 h-4"></i>
+          ข้อก่อนหน้า (←)
+        </button>
+
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400 font-medium hidden md:inline">กดคีย์ A, B, C, D หรือ 1-4 เพื่อเลือกคำตอบ</span>
+        </div>
+
+        <button onclick="nextQuestion()" id="btnNext" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all">
+          ข้อถัดไป (→)
+          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Modal 1: Question Navigator / Answer Sheet Grid -->
+  <div id="modalAnswerSheet" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 modal-enter overflow-hidden">
+      
+      <!-- Modal Header -->
+      <div class="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div>
+          <h3 class="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <i data-lucide="layout-grid" class="w-5 h-5 text-blue-600"></i>
+            กระดาษคำตอบ & แผนผังข้อสอบ (58 ข้อ)
+          </h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">คลิกหมายเลขข้อใดก็ได้เพื่อย้ายไปยังข้อนั้นทันที</p>
+        </div>
+        <button onclick="closeModal('modalAnswerSheet')" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Legend -->
+      <div class="px-5 py-2 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex flex-wrap gap-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+        <div class="flex items-center gap-1.5">
+          <span class="w-3.5 h-3.5 rounded-md bg-blue-600"></span>
+          <span>ตอบแล้ว</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-3.5 h-3.5 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"></span>
+          <span>ยังไม่ตอบ</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-3.5 h-3.5 rounded-md bg-amber-500"></span>
+          <span>ปักหมุดไว้ (Flag)</span>
+        </div>
+      </div>
+
+      <!-- Bubble Grid grouped by Section -->
+      <div id="answerSheetGrid" class="p-4 sm:p-5 overflow-y-auto space-y-5">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Footer -->
+      <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between">
+        <button onclick="resetAllAnswers()" class="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          ล้างคำตอบเริ่มใหม่
+        </button>
+        <button onclick="closeModal('modalAnswerSheet')" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold">
+          ปิดหน้าต่าง
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- Modal 2: Vocabulary Flashcards & Glossary -->
+  <div id="modalVocab" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 modal-enter overflow-hidden">
+      
+      <!-- Header -->
+      <div class="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 flex items-center justify-center shrink-0">
+            <i data-lucide="languages" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
+              คลังคำศัพท์วิชาการ CU-TEP (24 คำสำคัญ)
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">คำศัพท์คัดสรรจากทั้ง 9 บทอ่าน พร้อมความหมาย ตัวอย่าง และเสียงอ่าน</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modalVocab')" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Search & Filters -->
+      <div class="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
+        <div class="relative flex-1">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+          <input type="text" id="vocabSearch" oninput="renderVocabList()" placeholder="ค้นหาคำศัพท์ หรือ ความหมายภาษาไทย..." class="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-200">
+        </div>
+      </div>
+
+      <!-- Vocab Grid -->
+      <div id="vocabContainer" class="p-4 sm:p-5 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Footer -->
+      <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between text-xs text-slate-500">
+        <span>คลิกที่ปุ่มลำโพง 🔊 เพื่อฟังการออกเสียงภาษาอังกฤษ</span>
+        <button onclick="closeModal('modalVocab')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold">
+          เสร็จสิ้น
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- Modal 3: Chulatutor Reading Tips & Strategies -->
+  <div id="modalTips" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 modal-enter overflow-hidden">
+      
+      <!-- Header -->
+      <div class="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 flex items-center justify-center shrink-0">
+            <i data-lucide="lightbulb" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
+              เทคนิคพิชิต CU-TEP Reading (Chulatutor)
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">วิธีบริหารเวลา ตัดช้อยส์หลอก และทำข้อสอบให้ทัน 70 นาที</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modalTips')" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Tips List -->
+      <div id="tipsContainer" class="p-5 sm:p-6 overflow-y-auto space-y-3.5">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex justify-end">
+        <button onclick="closeModal('modalTips')" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold">
+          เข้าใจแล้ว เริ่มทำข้อสอบ
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- Modal 4: Exam Score & Analytics Report -->
+  <div id="modalScore" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 modal-enter overflow-hidden">
+      
+      <!-- Result Header -->
+      <div class="p-5 sm:p-6 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white relative">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-200">ผลการทดสอบ CU-TEP Reading</span>
+            <h3 class="text-xl sm:text-2xl font-black mt-1">สรุปคะแนนและการประเมินผล</h3>
+          </div>
+          <button onclick="closeModal('modalScore')" class="text-white/80 hover:text-white p-1 rounded-lg">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <!-- Big Score Card -->
+        <div class="mt-5 flex flex-wrap items-center justify-around gap-4 bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20">
+          <div class="text-center">
+            <p class="text-xs font-medium text-blue-100">คะแนนที่ได้</p>
+            <p class="text-3xl sm:text-4xl font-black mt-1"><span id="finalScoreVal">0</span><span class="text-base font-normal text-blue-200"> / 58</span></p>
+          </div>
+          <div class="text-center border-l border-white/20 pl-4 sm:pl-8">
+            <p class="text-xs font-medium text-blue-100">คิดเป็นร้อยละ</p>
+            <p class="text-3xl sm:text-4xl font-black mt-1" id="finalPercentageVal">0%</p>
+          </div>
+          <div class="text-center border-l border-white/20 pl-4 sm:pl-8">
+            <p class="text-xs font-medium text-blue-100">ระดับความพร้อม</p>
+            <p class="text-xs sm:text-sm font-extrabold mt-1.5 px-3 py-1 rounded-full bg-white text-blue-700 shadow-sm" id="finalLevelBadge">
+              ดีเยี่ยม (Target 50+)
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Breakdown by Passage & Detailed Analysis -->
+      <div class="p-5 sm:p-6 overflow-y-auto space-y-5">
+        <div>
+          <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2.5 flex items-center gap-2">
+            <i data-lucide="bar-chart-2" class="w-4 h-4 text-blue-600"></i>
+            สถิติตามแต่ละ Passage / ส่วนข้อสอบ
+          </h4>
+          <div id="sectionBreakdownContainer" class="space-y-2.5">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Diagnostic Advice -->
+        <div class="bg-blue-50 dark:bg-slate-800 p-4 rounded-2xl border border-blue-100 dark:border-slate-700">
+          <h5 class="text-xs font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider mb-1">
+            คำแนะนำเฉพาะบุคคลจาก Chulatutor:
+          </h5>
+          <p id="diagnosticAdvice" class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+            <!-- Custom advice based on score -->
+          </p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex flex-wrap items-center justify-between gap-2.5">
+        <button onclick="retakeExam()" class="px-4 py-2 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          สอบใหม่อีกครั้ง
+        </button>
+
+        <div class="flex items-center gap-2">
+          <button onclick="reviewWrongAnswersOnly()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm">
+            <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i>
+            ดูเฉลยเฉพาะข้อที่ผิด
+          </button>
+          <button onclick="reviewAllAnswers()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20">
+            <i data-lucide="file-search" class="w-3.5 h-3.5"></i>
+            ตรวจเฉลยละเอียดทุกข้อ
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="examData.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
