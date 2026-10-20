@@ -94,9 +94,9 @@
         </button>
 
         <!-- Vocab Bank Button -->
-        <button onclick="openModal('modalVocab')" title="คลังคำศัพท์วิชาการ CU-TEP" class="p-2 text-slate-600 hover:text-emerald-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded-xl transition-all flex items-center gap-1.5 text-xs font-semibold">
+        <button onclick="openModal('modalVocab')" title="คลังคำศัพท์วิชาการ CU-TEP (250 คำ)" class="p-2 text-slate-600 hover:text-emerald-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded-xl transition-all flex items-center gap-1.5 text-xs font-semibold">
           <i data-lucide="languages" class="w-4 h-4 text-emerald-600"></i>
-          <span class="hidden xl:inline">คำศัพท์ (24)</span>
+          <span id="vocabNavCount" class="hidden xl:inline">คำศัพท์ (250)</span>
         </button>
 
         <!-- Chulatutor Tips Button -->
@@ -182,8 +182,12 @@
             <p id="passageSubtitle" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">คำถามข้อ 1 - 15 (จำนวน 15 ช่องว่าง)</p>
           </div>
 
-          <!-- Thai Translation Toggle & Clear Clue Button -->
-          <div class="flex items-center gap-2">
+          <!-- Thai Translation & Passage Vocab Spotlight Buttons -->
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <button id="btnTogglePassageVocab" onclick="togglePassageVocabHighlight()" title="เปิด/ปิดการชี้เป้าคำศัพท์ CU-TEP ที่ปรากฏในบทความ" class="px-3 py-1.5 rounded-xl border border-blue-300 bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300 text-xs font-bold flex items-center gap-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all shadow-2xs">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400"></i>
+              <span id="passageVocabToggleText">✨ ชี้เป้าศัพท์ในเรื่อง</span>
+            </button>
             <button id="btnToggleThai" onclick="toggleThaiTranslation()" class="px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-1.5 hover:bg-emerald-100 transition-all shadow-2xs">
               <i data-lucide="languages" class="w-3.5 h-3.5 text-emerald-600"></i>
               <span id="thaiToggleText">🇹🇭 แปลไทยทั้งบทความ</span>
@@ -375,46 +379,266 @@
   </div>
 
 
-  <!-- Modal 2: Vocabulary Flashcards & Glossary -->
-  <div id="modalVocab" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 modal-enter overflow-hidden">
+  <!-- Floating In-Passage Vocab Popover -->
+  <div id="vocabPopover" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-3.5 text-xs shadow-2xl">
+    <!-- Populated dynamically via JS -->
+  </div>
+
+  <!-- Modal 2: Vocabulary Flashcards & Glossary & Quiz -->
+  <div id="modalVocab" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 modal-enter overflow-hidden">
       
-      <!-- Header -->
-      <div class="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+      <!-- Modal Header -->
+      <div class="p-3.5 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 flex items-center justify-center shrink-0">
-            <i data-lucide="languages" class="w-5 h-5"></i>
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+            <i data-lucide="book-marked" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
-              คลังคำศัพท์วิชาการ CU-TEP (24 คำสำคัญ)
-            </h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400">คำศัพท์คัดสรรจากทั้ง 9 บทอ่าน พร้อมความหมาย ตัวอย่าง และเสียงอ่าน</p>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
+                คลังคำศัพท์วิชาการ CU-TEP (250 คำออกสอบบ่อย)
+              </h3>
+              <span class="hidden sm:inline text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                Top High-Frequency
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">คัดสรรจากข้อสอบจริง 9 บทอ่าน, กริยา-คุณศัพท์วิชาการ และ 6 หมวดสาระสำคัญ</p>
           </div>
         </div>
-        <button onclick="closeModal('modalVocab')" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800">
+        <button onclick="closeModal('modalVocab')" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <!-- Search & Filters -->
-      <div class="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
-        <div class="relative flex-1">
-          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
-          <input type="text" id="vocabSearch" oninput="renderVocabList()" placeholder="ค้นหาคำศัพท์ หรือ ความหมายภาษาไทย..." class="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-200">
+      <!-- Navigation Mode Tabs inside Vocab Hub -->
+      <div class="flex items-center justify-between px-3 sm:px-5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 gap-2">
+        <div class="flex items-center gap-1.5 p-1 bg-slate-200/70 dark:bg-slate-700/60 rounded-xl text-xs font-bold">
+          <button id="tabVocabListBtn" onclick="switchVocabTab('list')" class="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-2xs transition-all flex items-center gap-1.5">
+            <i data-lucide="list" class="w-3.5 h-3.5"></i>
+            <span>คลังศัพท์ (250)</span>
+          </button>
+          <button id="tabVocabFlashcardsBtn" onclick="switchVocabTab('flashcards')" class="px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-1.5">
+            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+            <span>แฟลชการ์ดท่องจำ</span>
+          </button>
+          <button id="tabVocabQuizBtn" onclick="switchVocabTab('quiz')" class="px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-1.5">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            <span>มินิควิซวัดระดับ</span>
+          </button>
         </div>
+
+        <!-- Starred Filter Quick Counter -->
+        <button onclick="filterVocabByCategory('starred')" class="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50">
+          <i data-lucide="star" class="w-3.5 h-3.5 fill-amber-500 text-amber-500"></i>
+          <span>ติดดาวไว้ (<span id="starredCountBadge">0</span>)</span>
+        </button>
       </div>
 
-      <!-- Vocab Grid -->
-      <div id="vocabContainer" class="p-4 sm:p-5 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-        <!-- Rendered dynamically -->
+      <!-- VIEW 1: VOCABULARY LIST & SEARCH -->
+      <div id="vocabViewList" class="flex-1 flex flex-col overflow-hidden">
+        
+        <!-- Search & Category Filters Bar -->
+        <div class="p-3 sm:p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-2.5">
+          
+          <!-- Search Row -->
+          <div class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+              <input type="text" id="vocabSearch" oninput="renderVocabList()" placeholder="ค้นหาคำศัพท์ภาษาอังกฤษ, คำแปลไทย, หรือคำพ้อง (Synonyms)..." class="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-200">
+              <button id="btnVocabSearchClear" onclick="clearVocabSearch()" class="hidden absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+
+            <!-- Sort selector -->
+            <select id="vocabSortSelect" onchange="renderVocabList()" class="text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-2 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+              <option value="freq">เรียงตาม: ออกบ่อยสุด ⭐</option>
+              <option value="alpha">เรียงตาม: ตัวอักษร A-Z</option>
+              <option value="category">เรียงตาม: หมวดหมู่สาระ</option>
+            </select>
+          </div>
+
+          <!-- Category Pills Row (Horizontally Scrollable) -->
+          <div id="vocabCategoryPills" class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs font-semibold">
+            <!-- Dynamically populated category buttons -->
+          </div>
+
+          <!-- Alphabet A-Z Quick Jumper -->
+          <div id="vocabAlphaBar" class="hidden sm:flex items-center gap-1 overflow-x-auto pt-1 border-t border-slate-100 dark:border-slate-800">
+            <!-- Dynamically populated A-Z buttons -->
+          </div>
+
+        </div>
+
+        <!-- Vocab Cards Container -->
+        <div class="p-3 sm:p-5 overflow-y-auto flex-1">
+          <div class="flex items-center justify-between text-xs text-slate-400 font-medium mb-3 px-1">
+            <span id="vocabResultsCount">กำลังแสดงคำศัพท์...</span>
+            <span class="hidden sm:inline">กดรูปดาว ⭐ เพื่อบันทึกคำศัพท์ที่อยากท่องจำ</span>
+          </div>
+          <div id="vocabContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
       </div>
 
-      <!-- Footer -->
-      <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between text-xs text-slate-500">
-        <span>คลิกที่ปุ่มลำโพง 🔊 เพื่อฟังการออกเสียงภาษาอังกฤษ</span>
-        <button onclick="closeModal('modalVocab')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold">
-          เสร็จสิ้น
+      <!-- VIEW 2: FLASHCARDS INTERACTIVE MODE -->
+      <div id="vocabViewFlashcards" class="hidden flex-1 flex flex-col p-4 sm:p-6 overflow-y-auto">
+        
+        <!-- Flashcard Filter Toolbar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-500">เลือกหมวดหมู่:</span>
+            <select id="flashcardCategorySelect" onchange="initFlashcards()" class="text-xs font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-slate-700 dark:text-slate-200 focus:outline-none">
+              <option value="all">ทั้งหมด (250 คำ)</option>
+              <option value="top_frequency">⭐⭐⭐ ออกบ่อยสุดขีด (162 คำ)</option>
+              <option value="starred">⭐ เฉพาะที่ติดดาวไว้</option>
+              <option value="exam_passages">📖 ในข้อสอบ 9 เรื่อง (24 คำ)</option>
+              <option value="academic_verbs">⚡ กริยาวิชาการ (66 คำ)</option>
+              <option value="academic_adjectives">💎 คุณศัพท์วิชาการ (60 คำ)</option>
+              <option value="science_nature">🔬 วิทย์ & สิ่งแวดล้อม (20 คำ)</option>
+              <option value="economics_business">💼 เศรษฐศาสตร์ & การเงิน (20 คำ)</option>
+              <option value="medicine_psychology">🧠 การแพทย์ & จิตวิทยา (20 คำ)</option>
+              <option value="society_history">🏛️ สังคม & ประวัติศาสตร์ (20 คำ)</option>
+              <option value="arts_architecture">🎨 ศิลปะ & วรรณกรรม (20 คำ)</option>
+            </select>
+          </div>
+
+          <!-- Counter & Progress -->
+          <div class="flex items-center gap-2 text-xs font-bold">
+            <span id="flashcardCounter" class="text-emerald-600 dark:text-emerald-400">การ์ดที่ 1 / 250</span>
+            <span class="text-slate-300 dark:text-slate-700">|</span>
+            <span class="text-slate-500">จำได้แล้ว: <strong id="flashcardMasteredBadge" class="text-emerald-600">0</strong> คำ</span>
+          </div>
+        </div>
+
+        <!-- 3D Flip Card Scene -->
+        <div class="flashcard-scene max-w-xl mx-auto my-auto w-full">
+          <div id="flashcardInner" onclick="flipFlashcard()" class="flashcard-inner">
+            
+            <!-- Front Face -->
+            <div class="flashcard-face flashcard-front">
+              <div class="flex items-center justify-between text-xs text-slate-400">
+                <span id="fcFrontCategory" class="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold">Academic</span>
+                <div class="flex items-center gap-2">
+                  <span id="fcFrontFreq" class="text-amber-500 font-bold">⭐⭐⭐</span>
+                  <button onclick="event.stopPropagation(); toggleStarCurrentFlashcard();" id="fcFrontStarBtn" class="p-1 text-slate-400 hover:text-amber-500">
+                    <i data-lucide="star" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="my-auto py-6">
+                <h2 id="fcFrontWord" class="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white mb-2">accelerate</h2>
+                <span id="fcFrontPos" class="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-bold mb-4">v.</span>
+                <p class="text-xs text-slate-400 flex items-center justify-center gap-1">
+                  <i data-lucide="mouse-pointer-click" class="w-3.5 h-3.5"></i>
+                  คลิกที่การ์ดเพื่อดูคำแปล คำพ้อง และตัวอย่าง
+                </p>
+              </div>
+
+              <div class="flex items-center justify-between text-xs pt-3 border-t border-slate-100 dark:border-slate-800 text-slate-400">
+                <button onclick="event.stopPropagation(); speakWord(getCurrentFlashcardWord());" class="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 font-bold hover:bg-emerald-100 transition-colors">
+                  <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
+                  ฟังเสียงอ่าน
+                </button>
+                <span>กด Spacebar หรือคลิกเพื่อพลิก</span>
+              </div>
+            </div>
+
+            <!-- Back Face -->
+            <div class="flashcard-face flashcard-back">
+              <div class="flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300">
+                <span id="fcBackWord" class="text-base font-extrabold">accelerate</span>
+                <span id="fcBackPos" class="font-bold">v.</span>
+              </div>
+
+              <div class="my-auto py-3 text-left">
+                <p class="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-1">ความหมายภาษาไทย:</p>
+                <h3 id="fcBackMeaning" class="text-lg sm:text-xl font-black text-slate-900 dark:text-white mb-3">เร่งความเร็ว, ทำให้เร็วขึ้น</h3>
+
+                <div class="mb-3">
+                  <p class="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-0.5">คำพ้อง (Synonyms - ออกสอบบ่อย):</p>
+                  <p id="fcBackSynonyms" class="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">hasten, speed up, expedite</p>
+                </div>
+
+                <div id="fcBackAntonymsWrap" class="mb-3">
+                  <p class="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-0.5">คำตรงข้าม (Antonyms):</p>
+                  <p id="fcBackAntonyms" class="text-xs font-medium text-slate-600 dark:text-slate-300">decelerate, delay</p>
+                </div>
+
+                <div class="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-emerald-200/50 dark:border-emerald-800/40">
+                  <p class="text-[11px] font-bold text-slate-500 mb-0.5">ตัวอย่างประโยค CU-TEP Context:</p>
+                  <p id="fcBackExample" class="text-xs italic text-slate-700 dark:text-slate-300 leading-relaxed">"The government measures accelerated renewable energy adoption."</p>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between text-xs pt-2 border-t border-emerald-200/60 dark:border-emerald-800/60 text-slate-500">
+                <span id="fcBackPassage" class="truncate max-w-[200px]">CU-TEP Academic Core</span>
+                <button onclick="event.stopPropagation(); flipFlashcard();" class="text-emerald-700 dark:text-emerald-300 font-bold hover:underline">
+                  พลิกกลับ ⟲
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Flashcard Controls Toolbar -->
+        <div class="max-w-xl mx-auto w-full mt-4 flex flex-col gap-2.5">
+          <!-- Action Buttons -->
+          <div class="flex items-center justify-between gap-2">
+            <button onclick="markFlashcardReview()" class="flex-1 py-2 px-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-rose-100 transition-colors">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+              ยังจำไม่ได้ (ทวนซ้ำ)
+            </button>
+            <button onclick="markFlashcardMastered()" class="flex-1 py-2 px-3 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-100 transition-colors">
+              <i data-lucide="check" class="w-3.5 h-3.5"></i>
+              จำได้แล้ว ✅
+            </button>
+          </div>
+
+          <!-- Direction Controls -->
+          <div class="flex items-center justify-between">
+            <button onclick="prevFlashcard()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1">
+              <i data-lucide="chevron-left" class="w-4 h-4"></i>
+              ก่อนหน้า
+            </button>
+
+            <button onclick="shuffleFlashcards()" class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center gap-1">
+              <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
+              สุ่มการ์ด
+            </button>
+
+            <button onclick="nextFlashcard()" class="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-emerald-500/20">
+              ถัดไป
+              <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- VIEW 3: VOCABULARY MINI QUIZ -->
+      <div id="vocabViewQuiz" class="hidden flex-1 flex flex-col p-4 sm:p-6 overflow-y-auto">
+        
+        <!-- Quiz Start or Active State Container -->
+        <div id="quizContainer" class="max-w-xl mx-auto my-auto w-full">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-3.5 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between text-xs text-slate-500">
+        <span class="flex items-center gap-1.5">
+          <i data-lucide="volume-2" class="w-4 h-4 text-emerald-600"></i>
+          คลิกปุ่มลำโพงเพื่อฟังสำเนียงภาษาอังกฤษมาตรฐาน
+        </span>
+        <button onclick="closeModal('modalVocab')" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-md shadow-emerald-600/20">
+          ปิดหน้าต่าง
         </button>
       </div>
 
@@ -539,6 +763,7 @@
     </div>
   </div>
 
+  <script src="cuTepVocabData.js"></script>
   <script src="examData.js"></script>
   <script src="app.js"></script>
 </body>

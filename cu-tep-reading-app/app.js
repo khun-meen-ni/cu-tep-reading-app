@@ -18,7 +18,26 @@ let state = {
   soundEnabled: true,
   showThaiTranslation: false,
   searchKeyword: '',
-  mobileView: 'question' // 'passage' | 'question'
+  mobileView: 'question', // 'passage' | 'question'
+  highlightPassageVocab: false,
+  activeVocabTab: 'list', // 'list' | 'flashcards' | 'quiz'
+  activeVocabCategory: 'all',
+  vocabSearchQuery: '',
+  vocabSelectedLetter: null,
+  vocabSort: 'freq',
+  starredVocab: new Set(),
+  masteredVocab: new Set(),
+  flashcardIndex: 0,
+  flashcardsList: [],
+  flashcardIsFlipped: false,
+  vocabQuiz: {
+    active: false,
+    mode: 'synonym', // 'synonym' | 'meaning'
+    questions: [],
+    currentIndex: 0,
+    score: 0,
+    answered: false
+  }
 };
 
 // Question Category Classifier
@@ -57,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderApp();
   renderQuickStrip();
   renderTips();
-  renderVocabList();
+  initVocabHub();
   setupKeyboardShortcuts();
   lucide.createIcons();
 });
@@ -75,6 +94,15 @@ function loadSavedState() {
       if (parsed.isSubmitted) state.isSubmitted = parsed.isSubmitted;
       if (parsed.timerSeconds && !parsed.isSubmitted) state.timerSeconds = parsed.timerSeconds;
       if (typeof parsed.soundEnabled === 'boolean') state.soundEnabled = parsed.soundEnabled;
+    }
+
+    const savedStarred = localStorage.getItem('cutep_starred_vocab');
+    if (savedStarred) state.starredVocab = new Set(JSON.parse(savedStarred));
+    const savedMastered = localStorage.getItem('cutep_mastered_vocab');
+    if (savedMastered) state.masteredVocab = new Set(JSON.parse(savedMastered));
+
+    if (typeof CU_TEP_VOCAB_DATA !== 'undefined') {
+      EXAM_DATA.vocabList = CU_TEP_VOCAB_DATA;
     }
   } catch (e) {
     console.error('Failed to load state from localStorage', e);
@@ -94,6 +122,8 @@ function saveState() {
       soundEnabled: state.soundEnabled
     };
     localStorage.setItem('cutep_reading_state', JSON.stringify(toSave));
+    localStorage.setItem('cutep_starred_vocab', JSON.stringify(Array.from(state.starredVocab)));
+    localStorage.setItem('cutep_mastered_vocab', JSON.stringify(Array.from(state.masteredVocab)));
   } catch (e) {
     console.error('Failed to save state to localStorage', e);
   }
@@ -459,6 +489,11 @@ function renderPassage(section, currentQ) {
       });
     }
 
+    // Apply vocabulary in-passage spotlight highlighting if toggled ON
+    if (state.highlightPassageVocab) {
+      pFormatted = highlightVocabInText(pFormatted);
+    }
+
     // Apply keyword search highlighting if user searched
     if (state.searchKeyword.length >= 2) {
       const regex = new RegExp(`(${state.searchKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
@@ -744,43 +779,289 @@ function renderAnswerSheetGrid() {
   });
 }
 
-// --- VOCABULARY BANK & TEXT-TO-SPEECH ---
-function renderVocabList() {
-  const container = document.getElementById('vocabContainer');
-  const search = (document.getElementById('vocabSearch')?.value || '').toLowerCase();
+// --- CU-TEP COMPREHENSIVE VOCABULARY HUB ENGINE ---
+function getVocabDataSource() {
+  return typeof CU_TEP_VOCAB_DATA !== 'undefined' ? CU_TEP_VOCAB_DATA : EXAM_DATA.vocabList;
+}
+
+function initVocabHub() {
+  // Update header count badge
+  const allVocab = getVocabDataSource();
+  const navBadge = document.getElementById('vocabNavCount');
+  if (navBadge) {
+    navBadge.textContent = `คำศัพท์ (${allVocab.length})`;
+  }
+
+  renderVocabCategoryPills();
+  renderVocabAlphaBar();
+  renderVocabList();
+  initFlashcards();
+  initVocabQuiz();
+  updateStarredCountBadge();
+}
+
+function updateStarredCountBadge() {
+  const badge = document.getElementById('starredCountBadge');
+  if (badge) {
+    badge.textContent = state.starredVocab.size;
+  }
+}
+
+function switchVocabTab(tab) {
+  state.activeVocabTab = tab;
+  const tabList = document.getElementById('tabVocabListBtn');
+  const tabFlash = document.getElementById('tabVocabFlashcardsBtn');
+  const tabQuiz = document.getElementById('tabVocabQuizBtn');
+
+  const viewList = document.getElementById('vocabViewList');
+  const viewFlash = document.getElementById('vocabViewFlashcards');
+  const viewQuiz = document.getElementById('vocabViewQuiz');
+
+  const activeClass = 'px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-2xs transition-all flex items-center gap-1.5';
+  const inactiveClass = 'px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center gap-1.5';
+
+  if (tab === 'list') {
+    tabList.className = activeClass;
+    tabFlash.className = inactiveClass;
+    tabQuiz.className = inactiveClass;
+    viewList.classList.remove('hidden');
+    viewFlash.classList.add('hidden');
+    viewQuiz.classList.add('hidden');
+    renderVocabList();
+  } else if (tab === 'flashcards') {
+    tabFlash.className = activeClass;
+    tabList.className = inactiveClass;
+    tabQuiz.className = inactiveClass;
+    viewFlash.classList.remove('hidden');
+    viewList.classList.add('hidden');
+    viewQuiz.classList.add('hidden');
+    initFlashcards();
+  } else if (tab === 'quiz') {
+    tabQuiz.className = activeClass;
+    tabList.className = inactiveClass;
+    tabFlash.className = inactiveClass;
+    viewQuiz.classList.remove('hidden');
+    viewList.classList.add('hidden');
+    viewFlash.classList.add('hidden');
+    if (!state.vocabQuiz.active) {
+      initVocabQuiz();
+    }
+  }
+
+  lucide.createIcons();
+}
+
+// Category Pills Renderer
+function renderVocabCategoryPills() {
+  const container = document.getElementById('vocabCategoryPills');
+  if (!container || typeof CU_TEP_CATEGORIES === 'undefined') return;
+
+  container.innerHTML = '';
+  const allVocab = getVocabDataSource();
+
+  Object.values(CU_TEP_CATEGORIES).forEach((cat) => {
+    let count = cat.count;
+    if (cat.id === 'all') count = allVocab.length;
+    else if (cat.id === 'starred') count = state.starredVocab.size;
+    else if (cat.id === 'top_frequency') count = allVocab.filter(w => w.frequency === 3).length;
+    else count = allVocab.filter(w => w.category === cat.id).length;
+
+    const isActive = state.activeVocabCategory === cat.id;
+    const pill = document.createElement('button');
+    pill.className = `cat-pill px-3 py-1 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+      isActive 
+        ? 'active bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+        : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+    }`;
+    pill.innerHTML = `
+      <i data-lucide="${cat.icon}" class="w-3.5 h-3.5"></i>
+      <span>${cat.label}</span>
+      <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-emerald-700/60 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}">${count}</span>
+    `;
+    pill.onclick = () => filterVocabByCategory(cat.id);
+    container.appendChild(pill);
+  });
+
+  lucide.createIcons();
+}
+
+function filterVocabByCategory(catId) {
+  state.activeVocabCategory = catId;
+  state.vocabSelectedLetter = null;
+  renderVocabCategoryPills();
+  renderVocabAlphaBar();
+  renderVocabList();
+}
+
+// Alphabet Jumper Row Renderer
+function renderVocabAlphaBar() {
+  const container = document.getElementById('vocabAlphaBar');
+  if (!container) return;
   container.innerHTML = '';
 
-  const filtered = EXAM_DATA.vocabList.filter(v => 
-    v.word.toLowerCase().includes(search) || 
-    v.meaning.toLowerCase().includes(search) ||
-    v.passage.toLowerCase().includes(search)
-  );
+  const allBtn = document.createElement('button');
+  allBtn.className = `alpha-btn px-2 ${!state.vocabSelectedLetter ? 'active bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`;
+  allBtn.textContent = 'All';
+  allBtn.onclick = () => filterVocabByLetter(null);
+  container.appendChild(allBtn);
+
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  letters.forEach(letter => {
+    const btn = document.createElement('button');
+    const isActive = state.vocabSelectedLetter === letter;
+    btn.className = `alpha-btn ${isActive ? 'active bg-emerald-600 text-white' : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400'}`;
+    btn.textContent = letter;
+    btn.onclick = () => filterVocabByLetter(letter);
+    container.appendChild(btn);
+  });
+}
+
+function filterVocabByLetter(letter) {
+  state.vocabSelectedLetter = letter;
+  renderVocabAlphaBar();
+  renderVocabList();
+}
+
+function clearVocabSearch() {
+  const input = document.getElementById('vocabSearch');
+  if (input) input.value = '';
+  document.getElementById('btnVocabSearchClear')?.classList.add('hidden');
+  renderVocabList();
+}
+
+// Main Vocab Grid Renderer
+function renderVocabList() {
+  const container = document.getElementById('vocabContainer');
+  if (!container) return;
+
+  const searchInput = document.getElementById('vocabSearch');
+  const search = (searchInput?.value || '').trim().toLowerCase();
+  const clearBtn = document.getElementById('btnVocabSearchClear');
+  if (clearBtn) {
+    if (search.length > 0) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+
+  const sortMode = document.getElementById('vocabSortSelect')?.value || 'freq';
+  const allVocab = getVocabDataSource();
+
+  // 1. Filter by category
+  let filtered = allVocab.filter(v => {
+    if (state.activeVocabCategory === 'starred') {
+      return state.starredVocab.has(v.id || v.word);
+    }
+    if (state.activeVocabCategory === 'top_frequency') {
+      return v.frequency === 3;
+    }
+    if (state.activeVocabCategory !== 'all') {
+      return v.category === state.activeVocabCategory;
+    }
+    return true;
+  });
+
+  // 2. Filter by Alphabet letter
+  if (state.vocabSelectedLetter) {
+    filtered = filtered.filter(v => v.word.toUpperCase().startsWith(state.vocabSelectedLetter));
+  }
+
+  // 3. Filter by search query
+  if (search.length > 0) {
+    filtered = filtered.filter(v => 
+      v.word.toLowerCase().includes(search) || 
+      v.meaning.toLowerCase().includes(search) ||
+      (v.synonyms && v.synonyms.toLowerCase().includes(search)) ||
+      (v.example && v.example.toLowerCase().includes(search)) ||
+      (v.passage && v.passage.toLowerCase().includes(search))
+    );
+  }
+
+  // 4. Sort results
+  if (sortMode === 'freq') {
+    filtered.sort((a, b) => (b.frequency || 1) - (a.frequency || 1) || a.word.localeCompare(b.word));
+  } else if (sortMode === 'alpha') {
+    filtered.sort((a, b) => a.word.localeCompare(b.word));
+  } else if (sortMode === 'category') {
+    filtered.sort((a, b) => (a.category || '').localeCompare(b.category || '') || a.word.localeCompare(b.word));
+  }
+
+  // Update counter display
+  const countEl = document.getElementById('vocabResultsCount');
+  if (countEl) {
+    countEl.textContent = `พบ ${filtered.length} คำ (จากทั้งหมด ${allVocab.length} คำ)`;
+  }
+
+  container.innerHTML = '';
 
   if (filtered.length === 0) {
-    container.innerHTML = `<div class="col-span-2 text-center py-10 text-slate-400 text-sm">ไม่พบคำศัพท์ที่ตรงกับคำค้นหา</div>`;
+    container.innerHTML = `
+      <div class="col-span-1 md:col-span-2 text-center py-12 bg-slate-50 dark:bg-slate-800/40 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700">
+        <i data-lucide="search-x" class="w-10 h-10 text-slate-400 mx-auto mb-2"></i>
+        <p class="text-sm font-bold text-slate-700 dark:text-slate-300">ไม่พบคำศัพท์ที่ตรงกับเงื่อนไขการค้นหา</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">ลองเปลี่ยนคำค้นหา หรือกดดูคำศัพท์หมวดหมู่ "ทั้งหมด"</p>
+        <button onclick="clearVocabSearch(); filterVocabByCategory('all');" class="mt-3 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all">
+          ล้างตัวกรองทั้งหมด
+        </button>
+      </div>
+    `;
+    lucide.createIcons();
     return;
   }
 
   filtered.forEach((v) => {
+    const isStarred = state.starredVocab.has(v.id || v.word);
+    const freqStars = v.frequency === 3 ? '⭐⭐⭐' : (v.frequency === 2 ? '⭐⭐' : '⭐');
+    const freqLabel = v.frequency === 3 ? 'ออกบ่อยสุดขีด' : (v.frequency === 2 ? 'ออกบ่อยมาก' : 'ศัพท์สำคัญ');
+
     const card = document.createElement('div');
-    card.className = 'bg-slate-50 dark:bg-slate-800/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between hover:shadow-md transition-shadow';
+    card.className = 'bg-slate-50 dark:bg-slate-800/70 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between hover:shadow-md transition-all hover:border-emerald-300 dark:hover:border-emerald-700';
     card.innerHTML = `
       <div>
-        <div class="flex items-center justify-between mb-1.5">
-          <div class="flex items-center gap-2">
-            <h4 class="text-base font-extrabold text-blue-600 dark:text-blue-400">${v.word}</h4>
-            <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">${v.partOfSpeech}</span>
+        <!-- Top bar: Word, POS, Freq, Stars & Audio -->
+        <div class="flex items-start justify-between gap-2 mb-2">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <h4 class="text-base sm:text-lg font-black text-emerald-600 dark:text-emerald-400">${v.word}</h4>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300">${v.partOfSpeech}</span>
+            <span class="text-[11px] font-bold text-amber-500 ml-1" title="${freqLabel}">${freqStars}</span>
           </div>
-          <button onclick="speakWord('${v.word}')" title="ฟังการออกเสียง" class="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 transition-colors">
-            <i data-lucide="volume-2" class="w-4 h-4"></i>
-          </button>
+
+          <div class="flex items-center gap-1 shrink-0">
+            <button onclick="toggleStarVocab('${v.id || v.word}')" title="${isStarred ? 'ยกเลิกการติดดาว' : 'ติดดาวคำศัพท์นี้'}" class="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-slate-800 transition-colors">
+              <i data-lucide="star" class="w-4 h-4 ${isStarred ? 'fill-amber-500 text-amber-500' : ''}"></i>
+            </button>
+            <button onclick="speakWord('${v.word}')" title="ฟังการออกเสียง (Speech)" class="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 transition-colors">
+              <i data-lucide="volume-2" class="w-4 h-4"></i>
+            </button>
+          </div>
         </div>
-        <p class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1.5">${v.meaning}</p>
-        <p class="text-xs text-slate-600 dark:text-slate-400 italic mb-2">"${v.example}"</p>
+
+        <!-- Thai Meaning -->
+        <p class="text-sm font-extrabold text-slate-900 dark:text-white mb-2 leading-snug">${v.meaning}</p>
+
+        <!-- Synonyms (Closest in Meaning) -->
+        <div class="mb-2 text-xs">
+          <span class="font-bold text-slate-600 dark:text-slate-300 mr-1">คำพ้อง (Synonyms):</span>
+          <span class="text-emerald-700 dark:text-emerald-300 font-semibold">${v.synonyms}</span>
+        </div>
+
+        ${v.antonyms && v.antonyms !== '-' ? `
+          <div class="mb-2.5 text-xs">
+            <span class="font-bold text-rose-600 dark:text-rose-400 mr-1">คำตรงข้าม:</span>
+            <span class="text-slate-600 dark:text-slate-300">${v.antonyms}</span>
+          </div>
+        ` : ''}
+
+        <!-- Example sentence -->
+        <p class="text-xs text-slate-600 dark:text-slate-400 italic mb-3 p-2 bg-white/60 dark:bg-slate-900/40 rounded-xl border border-slate-200/50 dark:border-slate-800">
+          "${v.example}"
+        </p>
       </div>
-      <div class="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
-        <span>คำพ้อง: <strong class="text-slate-600 dark:text-slate-300">${v.synonyms}</strong></span>
-        <span class="truncate max-w-[130px] text-right font-medium">${v.passage}</span>
+
+      <!-- Card Footer Tag -->
+      <div class="pt-2.5 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
+        <span class="truncate max-w-[160px] font-medium text-slate-500 dark:text-slate-400">${v.passage || 'CU-TEP Academic Core'}</span>
+        <button onclick="openWordInFlashcards('${v.id || v.word}')" class="text-emerald-600 dark:text-emerald-400 font-bold hover:underline">
+          ท่องแฟลชการ์ด 🗂️
+        </button>
       </div>
     `;
     container.appendChild(card);
@@ -789,15 +1070,618 @@ function renderVocabList() {
   lucide.createIcons();
 }
 
+// Toggle Starred Vocab
+function toggleStarVocab(wordId) {
+  if (state.starredVocab.has(wordId)) {
+    state.starredVocab.delete(wordId);
+    showToast('นำออกจากรายการติดดาวแล้ว');
+  } else {
+    state.starredVocab.add(wordId);
+    showToast('บันทึกลงรายการติดดาว ⭐ แล้ว');
+  }
+  saveState();
+  updateStarredCountBadge();
+  renderVocabCategoryPills();
+  renderVocabList();
+}
+
+// Text to Speech
 function speakWord(word) {
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(word);
     utterance.lang = 'en-US';
-    utterance.rate = 0.9;
+    utterance.rate = 0.85;
     window.speechSynthesis.speak(utterance);
   } else {
     showToast('บราวเซอร์ของคุณไม่รองรับการออกเสียง');
+  }
+}
+
+// --- 3D INTERACTIVE FLASHCARDS MODE ---
+function initFlashcards() {
+  const cat = document.getElementById('flashcardCategorySelect')?.value || 'all';
+  const allVocab = getVocabDataSource();
+
+  if (cat === 'starred') {
+    state.flashcardsList = allVocab.filter(v => state.starredVocab.has(v.id || v.word));
+  } else if (cat === 'top_frequency') {
+    state.flashcardsList = allVocab.filter(v => v.frequency === 3);
+  } else if (cat !== 'all') {
+    state.flashcardsList = allVocab.filter(v => v.category === cat);
+  } else {
+    state.flashcardsList = [...allVocab];
+  }
+
+  state.flashcardIndex = 0;
+  state.flashcardIsFlipped = false;
+  updateFlashcardUI();
+}
+
+function openWordInFlashcards(wordId) {
+  switchVocabTab('flashcards');
+  const allVocab = getVocabDataSource();
+  state.flashcardsList = [...allVocab];
+  const idx = state.flashcardsList.findIndex(v => (v.id === wordId || v.word === wordId));
+  if (idx !== -1) {
+    state.flashcardIndex = idx;
+  }
+  state.flashcardIsFlipped = false;
+  updateFlashcardUI();
+}
+
+function getCurrentFlashcardWord() {
+  if (!state.flashcardsList || state.flashcardsList.length === 0) return '';
+  return state.flashcardsList[state.flashcardIndex]?.word || '';
+}
+
+function updateFlashcardUI() {
+  const cardInner = document.getElementById('flashcardInner');
+  if (!cardInner) return;
+
+  cardInner.classList.remove('flipped');
+  state.flashcardIsFlipped = false;
+
+  if (state.flashcardsList.length === 0) {
+    document.getElementById('fcFrontWord').textContent = 'ไม่มีคำศัพท์ในหมวดนี้';
+    document.getElementById('fcFrontPos').textContent = '-';
+    document.getElementById('fcBackMeaning').textContent = 'กรุณาเลือกหมวดหมู่อื่น หรือติดดาวคำศัพท์';
+    return;
+  }
+
+  const v = state.flashcardsList[state.flashcardIndex];
+  const isStarred = state.starredVocab.has(v.id || v.word);
+
+  // Front face
+  document.getElementById('fcFrontWord').textContent = v.word;
+  document.getElementById('fcFrontPos').textContent = v.partOfSpeech;
+  document.getElementById('fcFrontCategory').textContent = v.passage ? 'Passage Vocab' : (v.category ? v.category.replace('_', ' ').toUpperCase() : 'Academic');
+  document.getElementById('fcFrontFreq').textContent = v.frequency === 3 ? '⭐⭐⭐ ออกบ่อยสุดขีด' : (v.frequency === 2 ? '⭐⭐ ออกบ่อยมาก' : '⭐ ศัพท์สำคัญ');
+  const starIcon = document.querySelector('#fcFrontStarBtn i');
+  if (starIcon) {
+    if (isStarred) {
+      starIcon.setAttribute('class', 'w-4 h-4 fill-amber-500 text-amber-500');
+    } else {
+      starIcon.setAttribute('class', 'w-4 h-4 text-slate-400');
+    }
+  }
+
+  // Back face
+  document.getElementById('fcBackWord').textContent = v.word;
+  document.getElementById('fcBackPos').textContent = v.partOfSpeech;
+  document.getElementById('fcBackMeaning').textContent = v.meaning;
+  document.getElementById('fcBackSynonyms').textContent = v.synonyms;
+  document.getElementById('fcBackExample').textContent = `"${v.example}"`;
+  document.getElementById('fcBackPassage').textContent = v.passage || 'CU-TEP Academic Core';
+
+  const antWrap = document.getElementById('fcBackAntonymsWrap');
+  if (antWrap) {
+    if (v.antonyms && v.antonyms !== '-') {
+      antWrap.classList.remove('hidden');
+      document.getElementById('fcBackAntonyms').textContent = v.antonyms;
+    } else {
+      antWrap.classList.add('hidden');
+    }
+  }
+
+  // Counter
+  const counterEl = document.getElementById('flashcardCounter');
+  if (counterEl) {
+    counterEl.textContent = `การ์ดที่ ${state.flashcardIndex + 1} / ${state.flashcardsList.length}`;
+  }
+
+  const masteredBadge = document.getElementById('flashcardMasteredBadge');
+  if (masteredBadge) {
+    masteredBadge.textContent = state.masteredVocab.size;
+  }
+
+  lucide.createIcons();
+}
+
+function flipFlashcard() {
+  const cardInner = document.getElementById('flashcardInner');
+  if (!cardInner) return;
+  state.flashcardIsFlipped = !state.flashcardIsFlipped;
+  if (state.flashcardIsFlipped) {
+    cardInner.classList.add('flipped');
+  } else {
+    cardInner.classList.remove('flipped');
+  }
+}
+
+function nextFlashcard() {
+  if (state.flashcardsList.length === 0) return;
+  if (state.flashcardIndex < state.flashcardsList.length - 1) {
+    state.flashcardIndex++;
+  } else {
+    state.flashcardIndex = 0; // wrap around
+  }
+  updateFlashcardUI();
+}
+
+function prevFlashcard() {
+  if (state.flashcardsList.length === 0) return;
+  if (state.flashcardIndex > 0) {
+    state.flashcardIndex--;
+  } else {
+    state.flashcardIndex = state.flashcardsList.length - 1;
+  }
+  updateFlashcardUI();
+}
+
+function shuffleFlashcards() {
+  if (state.flashcardsList.length <= 1) return;
+  for (let i = state.flashcardsList.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [state.flashcardsList[i], state.flashcardsList[j]] = [state.flashcardsList[j], state.flashcardsList[i]];
+  }
+  state.flashcardIndex = 0;
+  updateFlashcardUI();
+  showToast('สุ่มลำดับแฟลชการ์ดเรียบร้อยแล้ว');
+}
+
+function markFlashcardMastered() {
+  const v = state.flashcardsList[state.flashcardIndex];
+  if (v) {
+    state.masteredVocab.add(v.id || v.word);
+    saveState();
+    showToast(`ท่องจำ "${v.word}" สำเร็จแล้ว ✅`);
+  }
+  nextFlashcard();
+}
+
+function markFlashcardReview() {
+  const v = state.flashcardsList[state.flashcardIndex];
+  if (v && state.masteredVocab.has(v.id || v.word)) {
+    state.masteredVocab.delete(v.id || v.word);
+    saveState();
+  }
+  showToast('บันทึกไว้สำหรับทบทวนซ้ำ');
+  nextFlashcard();
+}
+
+function toggleStarCurrentFlashcard() {
+  const v = state.flashcardsList[state.flashcardIndex];
+  if (v) {
+    toggleStarVocab(v.id || v.word);
+    updateFlashcardUI();
+  }
+}
+
+// --- VOCABULARY MINI QUIZ MODE ---
+function initVocabQuiz() {
+  const container = document.getElementById('quizContainer');
+  if (!container) return;
+
+  state.vocabQuiz.active = false;
+
+  container.innerHTML = `
+    <div class="text-center py-6">
+      <div class="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/10">
+        <i data-lucide="sparkles" class="w-8 h-8"></i>
+      </div>
+      <h3 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-2">
+        มินิควิซวัดระดับคำศัพท์ CU-TEP (10 ข้อ)
+      </h3>
+      <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-6">
+        ทดสอบความแม่นยำของคำศัพท์สำคัญที่พบบ่อยที่สุดในข้อสอบ CU-TEP Reading สุ่มชุดคำถามใหม่ทุกครั้ง!
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto">
+        <button onclick="startVocabQuiz('synonym')" class="p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-left hover:scale-[1.02] transition-all">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">A</span>
+            <h4 class="text-sm font-extrabold text-emerald-900 dark:text-emerald-200">Closest in Meaning</h4>
+          </div>
+          <p class="text-xs text-slate-600 dark:text-slate-400">ค้นหาคำพ้องความหมาย (Synonyms) เหมือนข้อสอบ Reading ตัวจริง</p>
+        </button>
+
+        <button onclick="startVocabQuiz('meaning')" class="p-4 rounded-2xl border-2 border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-left hover:scale-[1.02] transition-all">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">B</span>
+            <h4 class="text-sm font-extrabold text-blue-900 dark:text-blue-200">Thai Meaning</h4>
+          </div>
+          <p class="text-xs text-slate-600 dark:text-slate-400">เลือกความหมายภาษาไทยที่ถูกต้องตามบริบทวิชาการ</p>
+        </button>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+}
+
+function startVocabQuiz(mode = 'synonym') {
+  const allVocab = getVocabDataSource();
+  if (allVocab.length < 10) return;
+
+  state.vocabQuiz = {
+    active: true,
+    mode: mode,
+    questions: [],
+    currentIndex: 0,
+    score: 0,
+    answered: false
+  };
+
+  // Pick 10 random words
+  const shuffled = [...allVocab].sort(() => 0.5 - Math.random());
+  const selectedWords = shuffled.slice(0, 10);
+
+  state.vocabQuiz.questions = selectedWords.map((target) => {
+    let correctAnswer = '';
+    let distractors = [];
+
+    if (mode === 'synonym') {
+      const synList = target.synonyms.split(',').map(s => s.trim());
+      correctAnswer = synList[0] || target.synonyms;
+
+      // Distractors from other words with same POS or different words
+      const others = allVocab.filter(w => w.id !== target.id);
+      const shuffledOthers = [...others].sort(() => 0.5 - Math.random());
+      for (const other of shuffledOthers) {
+        const otherSyn = other.synonyms.split(',')[0].trim();
+        if (otherSyn && otherSyn !== correctAnswer && !distractors.includes(otherSyn)) {
+          distractors.push(otherSyn);
+        }
+        if (distractors.length === 3) break;
+      }
+    } else {
+      correctAnswer = target.meaning;
+      const others = allVocab.filter(w => w.id !== target.id);
+      const shuffledOthers = [...others].sort(() => 0.5 - Math.random());
+      for (const other of shuffledOthers) {
+        if (other.meaning && other.meaning !== correctAnswer && !distractors.includes(other.meaning)) {
+          distractors.push(other.meaning);
+        }
+        if (distractors.length === 3) break;
+      }
+    }
+
+    const options = [correctAnswer, ...distractors].sort(() => 0.5 - Math.random());
+    return {
+      targetWord: target,
+      options: options,
+      correctAnswer: correctAnswer,
+      userAnswer: null
+    };
+  });
+
+  renderQuizQuestion();
+}
+
+function renderQuizQuestion() {
+  const container = document.getElementById('quizContainer');
+  if (!container) return;
+
+  const q = state.vocabQuiz.questions[state.vocabQuiz.currentIndex];
+  const qNum = state.vocabQuiz.currentIndex + 1;
+  const isSynonymMode = state.vocabQuiz.mode === 'synonym';
+
+  container.innerHTML = `
+    <div class="bg-white dark:bg-slate-800/80 p-5 sm:p-7 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xl max-w-xl mx-auto">
+      
+      <!-- Top header bar -->
+      <div class="flex items-center justify-between text-xs font-bold text-slate-400 mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
+        <span>ข้อที่ ${qNum} / 10</span>
+        <span class="text-emerald-600 dark:text-emerald-400">คะแนนปัจจุบัน: ${state.vocabQuiz.score}</span>
+      </div>
+
+      <!-- Question Prompt -->
+      <div class="text-center py-4 mb-4">
+        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+          ${isSynonymMode ? 'The word below is closest in meaning to:' : 'คำศัพท์ด้านล่างนี้มีความหมายตรงกับข้อใด?'}
+        </p>
+        <div class="flex items-center justify-center gap-2">
+          <h2 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">${q.targetWord.word}</h2>
+          <span class="text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">${q.targetWord.partOfSpeech}</span>
+          <button onclick="speakWord('${q.targetWord.word}')" class="p-1 rounded-lg text-emerald-600 hover:bg-emerald-100 dark:hover:bg-slate-700">
+            <i data-lucide="volume-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <p class="text-xs text-slate-400 italic mt-1">"${q.targetWord.example}"</p>
+      </div>
+
+      <!-- 4 Options Grid -->
+      <div id="quizOptionsGrid" class="flex flex-col gap-2.5 mb-4">
+        ${q.options.map((opt, idx) => `
+          <button onclick="selectQuizAnswer(${idx})" id="quizOpt_${idx}" class="quiz-option-item p-3.5 rounded-2xl text-left text-xs sm:text-sm font-semibold flex items-center justify-between bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 transition-all">
+            <span>${opt}</span>
+            <span class="w-6 h-6 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold shrink-0">
+              ${['A', 'B', 'C', 'D'][idx]}
+            </span>
+          </button>
+        `).join('')}
+      </div>
+
+      <!-- Feedback card (hidden until answered) -->
+      <div id="quizFeedbackBox" class="hidden p-3.5 rounded-2xl text-xs leading-relaxed mb-4"></div>
+
+      <!-- Next Button -->
+      <button id="btnQuizNext" onclick="nextQuizQuestion()" class="hidden w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-sm transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2">
+        <span>ข้อถัดไป</span>
+        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </button>
+
+    </div>
+  `;
+
+  state.vocabQuiz.answered = false;
+  lucide.createIcons();
+}
+
+function selectQuizAnswer(optIdx) {
+  if (state.vocabQuiz.answered) return;
+  state.vocabQuiz.answered = true;
+
+  const q = state.vocabQuiz.questions[state.vocabQuiz.currentIndex];
+  const selected = q.options[optIdx];
+  q.userAnswer = selected;
+
+  const isCorrect = selected === q.correctAnswer;
+  if (isCorrect) {
+    state.vocabQuiz.score++;
+    if (state.soundEnabled) playSuccessSound();
+  } else {
+    if (state.soundEnabled) playErrorSound();
+  }
+
+  // Highlight choices
+  q.options.forEach((opt, idx) => {
+    const btn = document.getElementById(`quizOpt_${idx}`);
+    if (btn) {
+      if (opt === q.correctAnswer) {
+        btn.className = 'quiz-option-item correct p-3.5 rounded-2xl text-left text-xs sm:text-sm flex items-center justify-between shadow-xs';
+      } else if (idx === optIdx && !isCorrect) {
+        btn.className = 'quiz-option-item wrong p-3.5 rounded-2xl text-left text-xs sm:text-sm flex items-center justify-between shadow-xs';
+      } else {
+        btn.className = 'quiz-option-item p-3.5 rounded-2xl text-left text-xs sm:text-sm flex items-center justify-between opacity-50';
+      }
+    }
+  });
+
+  // Display feedback
+  const fbBox = document.getElementById('quizFeedbackBox');
+  if (fbBox) {
+    fbBox.classList.remove('hidden');
+    if (isCorrect) {
+      fbBox.className = 'p-3.5 rounded-2xl text-xs leading-relaxed mb-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200';
+      fbBox.innerHTML = `<strong>ถูกต้องยอดเยี่ยม! 🎉</strong> "${q.targetWord.word}" (${q.targetWord.partOfSpeech}) แปลว่า: ${q.targetWord.meaning} (คำพ้อง: ${q.targetWord.synonyms})`;
+    } else {
+      fbBox.className = 'p-3.5 rounded-2xl text-xs leading-relaxed mb-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200';
+      fbBox.innerHTML = `<strong>ยังไม่ถูกต้อง!</strong> คำตอบที่ถูกต้องคือ: <strong>${q.correctAnswer}</strong><br>"${q.targetWord.word}" (${q.targetWord.partOfSpeech}) แปลว่า: ${q.targetWord.meaning} (คำพ้อง: ${q.targetWord.synonyms})`;
+    }
+  }
+
+  const nextBtn = document.getElementById('btnQuizNext');
+  if (nextBtn) {
+    nextBtn.classList.remove('hidden');
+    if (state.vocabQuiz.currentIndex === 9) {
+      nextBtn.innerHTML = `<span>ดูสรุปผลคะแนน</span> <i data-lucide="award" class="w-4 h-4"></i>`;
+    }
+  }
+
+  lucide.createIcons();
+}
+
+function nextQuizQuestion() {
+  if (state.vocabQuiz.currentIndex < 9) {
+    state.vocabQuiz.currentIndex++;
+    renderQuizQuestion();
+  } else {
+    renderQuizResults();
+  }
+}
+
+function renderQuizResults() {
+  const container = document.getElementById('quizContainer');
+  if (!container) return;
+
+  const score = state.vocabQuiz.score;
+  const pct = Math.round((score / 10) * 100);
+
+  let badge = 'ยอดเยี่ยมมาก! ศัพท์แน่นพร้อมสอบ CU-TEP';
+  let badgeColor = 'text-emerald-600 bg-emerald-100 dark:bg-emerald-950';
+  if (score < 6) {
+    badge = 'ควรหมั่นทบทวนแฟลชการ์ดและท่องศัพท์เพิ่มเติม';
+    badgeColor = 'text-amber-600 bg-amber-100 dark:bg-amber-950';
+  } else if (score < 8) {
+    badge = 'เกณฑ์ดี! ฝึกทำควิซอีกนิดจะแม่นยำยิ่งขึ้น';
+    badgeColor = 'text-blue-600 bg-blue-100 dark:bg-blue-950';
+  }
+
+  container.innerHTML = `
+    <div class="bg-white dark:bg-slate-800/80 p-6 sm:p-8 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xl max-w-xl mx-auto text-center">
+      <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300 flex items-center justify-center mx-auto mb-3">
+        <i data-lucide="award" class="w-8 h-8"></i>
+      </div>
+      <h3 class="text-2xl font-black text-slate-900 dark:text-white mb-1">ผลคะแนนมินิควิซ</h3>
+      <p class="text-xs text-slate-400 mb-4">ทดสอบคำศัพท์วิชาการ CU-TEP 10 ข้อ</p>
+
+      <div class="py-4 my-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-700">
+        <span class="text-4xl font-black text-emerald-600 dark:text-emerald-400">${score}</span>
+        <span class="text-lg font-bold text-slate-400"> / 10</span>
+        <p class="text-xs font-bold text-slate-500 mt-1">ความถูกต้อง ${pct}%</p>
+      </div>
+
+      <p class="inline-block px-3 py-1 rounded-full text-xs font-bold ${badgeColor} mb-6">
+        ${badge}
+      </p>
+
+      <div class="flex items-center gap-2 justify-center">
+        <button onclick="startVocabQuiz('${state.vocabQuiz.mode}')" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          ทำควิซใหม่อีกรอบ
+        </button>
+        <button onclick="initVocabQuiz()" class="px-4 py-2.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300">
+          เลือกโหมดอื่น
+        </button>
+      </div>
+    </div>
+  `;
+
+  lucide.createIcons();
+}
+
+// --- IN-PASSAGE VOCABULARY SPOTLIGHT & POPOVER ---
+function togglePassageVocabHighlight() {
+  state.highlightPassageVocab = !state.highlightPassageVocab;
+  const btn = document.getElementById('btnTogglePassageVocab');
+  const text = document.getElementById('passageVocabToggleText');
+
+  if (state.highlightPassageVocab) {
+    if (btn) btn.className = 'px-3 py-1.5 rounded-xl border border-blue-500 bg-blue-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all';
+    if (text) text.textContent = '✨ ซ่อนศัพท์ในเรื่อง';
+    showToast('ชี้เป้าคำศัพท์ CU-TEP ในบทอ่านแล้ว (คลิกที่คำศัพท์เพื่อดูความหมาย)');
+  } else {
+    if (btn) btn.className = 'px-3 py-1.5 rounded-xl border border-blue-300 bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300 text-xs font-bold flex items-center gap-1.5 hover:bg-blue-100 transition-all shadow-2xs';
+    if (text) text.textContent = '✨ ชี้เป้าศัพท์ในเรื่อง';
+    closePassageVocabPopover();
+    showToast('ปิดการชี้เป้าคำศัพท์แล้ว');
+  }
+
+  const qData = flatQuestions.find(q => q.num === state.currentQuestionNum);
+  const section = EXAM_DATA.sections[qData.sectionIndex];
+  renderPassage(section, qData);
+}
+
+function highlightVocabInText(htmlText) {
+  if (!state.highlightPassageVocab) return htmlText;
+  const allVocab = getVocabDataSource();
+  if (!allVocab || allVocab.length === 0) return htmlText;
+
+  if (!window._sortedVocab) {
+    window._sortedVocab = [...allVocab].sort((a, b) => b.word.length - a.word.length);
+  }
+
+  // Split by HTML tags so we only replace text within actual content
+  const parts = htmlText.split(/(<[^>]+>)/g);
+
+  return parts.map(part => {
+    if (part.startsWith('<') && part.endsWith('>')) {
+      return part;
+    }
+
+    let modified = part;
+    window._sortedVocab.forEach(v => {
+      const escaped = v.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b(${escaped}(?:s|ed|ing|ly|d|es)?)\\b`, 'gi');
+      modified = modified.replace(regex, (match) => {
+        return `<span class="vocab-term" onclick="showPassageVocabPopover(event, '${v.id || v.word}')" title="คลิกดูคำแปล: ${v.word} (${v.partOfSpeech})">${match}</span>`;
+      });
+    });
+
+    return modified;
+  }).join('');
+}
+
+function showPassageVocabPopover(event, wordId) {
+  if (event) event.stopPropagation();
+  const popover = document.getElementById('vocabPopover');
+  if (!popover) return;
+
+  const allVocab = getVocabDataSource();
+  const v = allVocab.find(item => item.id === wordId || item.word.toLowerCase() === wordId.toLowerCase());
+  if (!v) return;
+
+  const isStarred = state.starredVocab && state.starredVocab.has(v.id || v.word);
+  const freqStars = v.frequency === 3 ? '⭐⭐⭐ ออกบ่อยสุดขีด' : (v.frequency === 2 ? '⭐⭐ ออกบ่อยมาก' : '⭐ ศัพท์สำคัญ');
+
+  popover.innerHTML = `
+    <div class="flex items-start justify-between gap-2 mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+      <div>
+        <div class="flex items-center gap-1.5">
+          <h4 class="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">${v.word}</h4>
+          <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">${v.partOfSpeech}</span>
+          <span class="text-[10px] font-bold text-amber-500">${freqStars}</span>
+        </div>
+        <p class="text-xs font-bold text-slate-900 dark:text-white mt-1">${v.meaning}</p>
+      </div>
+      <div class="flex items-center gap-1 shrink-0">
+        <button onclick="speakWord('${v.word}')" title="ฟังเสียงอ่าน" class="p-1 rounded-lg text-emerald-600 hover:bg-emerald-100 dark:hover:bg-slate-800 transition-colors">
+          <i data-lucide="volume-2" class="w-4 h-4"></i>
+        </button>
+        <button onclick="toggleStarVocab('${v.id || v.word}'); showPassageVocabPopover(null, '${v.id || v.word}');" title="ติดดาว" class="p-1 rounded-lg text-amber-500 hover:bg-amber-50 dark:hover:bg-slate-800 transition-colors">
+          <i data-lucide="star" class="w-4 h-4 ${isStarred ? 'fill-amber-500' : ''}"></i>
+        </button>
+        <button onclick="closePassageVocabPopover()" class="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+    <div class="text-[11px] text-slate-600 dark:text-slate-300 mb-2">
+      <span class="font-bold text-slate-700 dark:text-slate-200">คำพ้อง (Synonyms):</span>
+      <span class="text-emerald-700 dark:text-emerald-300 font-semibold">${v.synonyms}</span>
+    </div>
+    ${v.antonyms && v.antonyms !== '-' ? `
+      <div class="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+        <span class="font-bold text-rose-600 dark:text-rose-400">คำตรงข้าม:</span> ${v.antonyms}
+      </div>
+    ` : ''}
+    <div class="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-[11px] italic text-slate-600 dark:text-slate-400 mb-2">
+      "${v.example}"
+    </div>
+    <div class="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100 dark:border-slate-800">
+      <span class="text-slate-400 truncate max-w-[140px]">${v.passage || 'CU-TEP High-Frequency'}</span>
+      <button onclick="openWordInVocabHub('${v.word}')" class="text-emerald-600 dark:text-emerald-400 font-bold hover:underline flex items-center gap-1">
+        เปิดดูในคลังศัพท์ <i data-lucide="arrow-right" class="w-3 h-3"></i>
+      </button>
+    </div>
+  `;
+
+  popover.classList.remove('hidden');
+  lucide.createIcons();
+
+  if (event && event.currentTarget) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const popoverWidth = 320;
+    let left = rect.left;
+    if (left + popoverWidth > window.innerWidth - 16) {
+      left = window.innerWidth - popoverWidth - 16;
+    }
+    let top = rect.bottom + 8;
+    if (top + 230 > window.innerHeight) {
+      top = rect.top - 230;
+    }
+    popover.style.position = 'fixed';
+    popover.style.left = `${Math.max(12, left)}px`;
+    popover.style.top = `${Math.max(12, top)}px`;
+  }
+}
+
+function closePassageVocabPopover() {
+  const popover = document.getElementById('vocabPopover');
+  if (popover) popover.classList.add('hidden');
+}
+
+function openWordInVocabHub(word) {
+  closePassageVocabPopover();
+  openModal('modalVocab');
+  switchVocabTab('list');
+  const searchInput = document.getElementById('vocabSearch');
+  if (searchInput) {
+    searchInput.value = word;
+    state.activeVocabCategory = 'all';
+    renderVocabCategoryPills();
+    renderVocabList();
   }
 }
 
@@ -979,6 +1863,25 @@ function setupKeyboardShortcuts() {
   window.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
+    // Flashcard mode navigation shortcuts when modalVocab is open
+    const modalVocab = document.getElementById('modalVocab');
+    const isVocabOpen = modalVocab && !modalVocab.classList.contains('hidden');
+    if (isVocabOpen && state.activeVocabTab === 'flashcards') {
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        flipFlashcard();
+        return;
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        nextFlashcard();
+        return;
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        prevFlashcard();
+        return;
+      }
+    }
+
     const key = e.key.toUpperCase();
     if (['A', 'B', 'C', 'D'].includes(key)) {
       selectOption(state.currentQuestionNum, key);
@@ -993,6 +1896,7 @@ function setupKeyboardShortcuts() {
       toggleCurrentFlag();
     } else if (e.key === 'Escape') {
       ['modalAnswerSheet', 'modalVocab', 'modalTips', 'modalScore'].forEach(id => closeModal(id));
+      closePassageVocabPopover();
       hideAppearanceDropdown();
     }
   });
@@ -1002,6 +1906,12 @@ function setupKeyboardShortcuts() {
     const menu = document.getElementById('appearanceMenu');
     if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
       menu.classList.add('hidden');
+    }
+
+    // Close in-passage vocab popover when clicked outside
+    const popover = document.getElementById('vocabPopover');
+    if (popover && !popover.classList.contains('hidden') && !popover.contains(e.target) && !e.target.closest('.vocab-term')) {
+      closePassageVocabPopover();
     }
   });
 }
